@@ -13,8 +13,8 @@ import (
 	"io"
 	"os"
 
-	contracts "github.com/Armur-Ai/armur-contracts"
 	"github.com/Armur-Ai/Dhantra/pkg/remediation"
+	contracts "github.com/Armur-Ai/armur-contracts"
 )
 
 func main() {
