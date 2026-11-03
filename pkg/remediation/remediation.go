@@ -12,7 +12,10 @@ package remediation
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
+	"sort"
 	"time"
 
 	contracts "github.com/Armur-Ai/armur-contracts"
@@ -63,6 +66,46 @@ func (Planner) PrepareWorkspace(plan contracts.RemediationPlan) (*Workspace, err
 		base = plan.BaseRevisions[0]
 	}
 	return NewWorkspace(base)
+}
+
+// DryRun writes the proposed file contents into a fresh isolated workspace and
+// returns a ChangeArtifact describing them — with a real content digest — but
+// WITHOUT applying anything to any real repository. The artifact is explicitly
+// marked review_state="proposed": a dry run is a proposal, never a repair.
+func (Planner) DryRun(plan contracts.RemediationPlan, proposed map[string][]byte) (contracts.ChangeArtifact, error) {
+	ws, err := (Planner{}).PrepareWorkspace(plan)
+	if err != nil {
+		return contracts.ChangeArtifact{}, err
+	}
+	defer ws.Cleanup()
+
+	paths := make([]string, 0, len(proposed))
+	for p := range proposed {
+		paths = append(paths, p)
+	}
+	sort.Strings(paths) // deterministic digest + changed-path ordering
+
+	h := sha256.New()
+	for _, p := range paths {
+		if err := ws.WriteFile(p, proposed[p]); err != nil {
+			return contracts.ChangeArtifact{}, err
+		}
+		h.Write([]byte(p))
+		h.Write([]byte{0})
+		h.Write(proposed[p])
+	}
+	base := ""
+	if len(plan.BaseRevisions) > 0 {
+		base = plan.BaseRevisions[0]
+	}
+	return contracts.ChangeArtifact{
+		ChangeID:         "dryrun-" + hex.EncodeToString(h.Sum(nil))[:12],
+		BaseRevision:     base,
+		PatchDigest:      hex.EncodeToString(h.Sum(nil)),
+		ChangedPaths:     paths,
+		AgentAttribution: "dhantra (automated dry-run)",
+		ReviewState:      "proposed", // nothing applied; a proposal only
+	}, nil
 }
 
 // Execute would apply the plan in an isolated workspace and return a

@@ -35,3 +35,32 @@ func TestExecuteDoesNotFabricateAChange(t *testing.T) {
 		t.Fatal("scaffold Execute must not fabricate a ChangeArtifact")
 	}
 }
+
+func TestDryRunProposesNotApplies(t *testing.T) {
+	plan := contracts.RemediationPlan{PlanID: "p", BaseRevisions: []string{"base1"}}
+	proposed := map[string][]byte{
+		"go.mod":     []byte("module x\n"),
+		"src/fix.go": []byte("package x"),
+	}
+	art, err := Planner{}.DryRun(plan, proposed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if art.ReviewState != "proposed" {
+		t.Fatalf("dry-run must be 'proposed', got %q", art.ReviewState)
+	}
+	if art.PatchDigest == "" || len(art.ChangedPaths) != 2 {
+		t.Fatalf("artifact incomplete: %+v", art)
+	}
+	if art.ChangedPaths[0] != "go.mod" || art.ChangedPaths[1] != "src/fix.go" {
+		t.Fatalf("changed paths should be sorted: %v", art.ChangedPaths)
+	}
+	if art.BaseRevision != "base1" {
+		t.Fatalf("base revision = %q", art.BaseRevision)
+	}
+	// deterministic digest for identical input
+	art2, _ := Planner{}.DryRun(plan, proposed)
+	if art2.PatchDigest != art.PatchDigest {
+		t.Fatal("digest should be deterministic for identical input")
+	}
+}
