@@ -3,6 +3,8 @@ package remediation
 import (
 	"os"
 	"testing"
+
+	contracts "github.com/Armur-Ai/armur-contracts"
 )
 
 func TestWorkspaceWriteReadCleanup(t *testing.T) {
@@ -46,5 +48,17 @@ func TestWorkspaceRejectsTraversal(t *testing.T) {
 	// a benign nested path is fine
 	if err := w.WriteFile("a/b/c.txt", []byte("x")); err != nil {
 		t.Fatalf("benign nested path should work: %v", err)
+	}
+}
+
+func TestPrepareWorkspaceFromPlan(t *testing.T) {
+	plan := contracts.RemediationPlan{BaseRevisions: []string{"rev-99"}}
+	ws, err := Planner{}.PrepareWorkspace(plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ws.Cleanup()
+	if ws.BaseRevision() != "rev-99" {
+		t.Fatalf("workspace base = %q, want rev-99", ws.BaseRevision())
 	}
 }

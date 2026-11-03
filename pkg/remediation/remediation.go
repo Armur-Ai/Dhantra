@@ -53,6 +53,18 @@ func missingInputs(req contracts.RemediationRequest) []string {
 	return m
 }
 
+// PrepareWorkspace creates an isolated workspace pinned to the plan's base
+// revision, ready for change execution. The caller must defer Cleanup. This is
+// the honest seam between planning and execution: it sets up the sandbox but
+// makes no changes.
+func (Planner) PrepareWorkspace(plan contracts.RemediationPlan) (*Workspace, error) {
+	base := ""
+	if len(plan.BaseRevisions) > 0 {
+		base = plan.BaseRevisions[0]
+	}
+	return NewWorkspace(base)
+}
+
 // Execute would apply the plan in an isolated workspace and return a
 // ChangeArtifact. Not implemented in the scaffold: it returns an explicit error
 // rather than fabricating a change (never claim a repair that did not happen).
