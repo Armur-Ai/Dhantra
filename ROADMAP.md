@@ -10,7 +10,7 @@
 - ☐ LICENSE, CI (build + `go test ./...`).
 
 ## Phase 1 — Isolation substrate (safety first)
-- ☐ Isolated worktree/branch pinned to a base revision; capture + preserve dirty/unrelated state.
+- ◐ Isolated temp workspace pinned to a base revision, write-bounded (no traversal), guaranteed cleanup (pkg/remediation Workspace).
 - ☐ Enforcing build/execution isolation profile (no host Docker socket, no broad home mount, no production/cloud creds); resource/network/filesystem limits outside the model.
 - ☐ Hostile-build-script fixture test (prove containment; regex filters are not containment).
 
