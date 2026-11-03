@@ -38,9 +38,17 @@ func (w *Workspace) resolve(rel string) (string, error) {
 	if rel == "" {
 		return "", fmt.Errorf("remediation: empty path")
 	}
-	// Force the path to be workspace-relative, then join + verify containment.
-	clean := filepath.Clean(string(filepath.Separator) + rel)
-	full := filepath.Join(w.dir, clean)
+	if filepath.IsAbs(rel) {
+		return "", fmt.Errorf("remediation: absolute path %q not allowed", rel)
+	}
+	// Reject any parent-dir traversal element outright (clearer than silently
+	// clamping it back inside).
+	for _, seg := range strings.Split(filepath.ToSlash(rel), "/") {
+		if seg == ".." {
+			return "", fmt.Errorf("remediation: path %q escapes the workspace", rel)
+		}
+	}
+	full := filepath.Join(w.dir, filepath.Clean(rel))
 	root := filepath.Clean(w.dir)
 	if full != root && !strings.HasPrefix(full, root+string(filepath.Separator)) {
 		return "", fmt.Errorf("remediation: path %q escapes the workspace", rel)
