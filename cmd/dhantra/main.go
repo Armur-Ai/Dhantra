@@ -21,7 +21,7 @@ import (
 
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Fprintln(os.Stderr, "usage: dhantra plan < request.json   |   dhantra from-snapshot < snapshot.json   |   dhantra dryrun --propose <dir> < plan.json   |   dhantra version")
+		fmt.Fprintln(os.Stderr, "usage: dhantra plan < request.json   |   dhantra from-snapshot < snapshot.json   |   dhantra guide [--report] < snapshot.json   |   dhantra dryrun --propose <dir> < plan.json   |   dhantra version")
 		os.Exit(2)
 	}
 	switch os.Args[1] {
@@ -29,6 +29,8 @@ func main() {
 		runPlan()
 	case "from-snapshot":
 		runFromSnapshot()
+	case "guide":
+		runGuide(os.Args[2:])
 	case "dryrun":
 		runDryRun(os.Args[2:])
 	case "version":
@@ -135,6 +137,57 @@ func runFromSnapshot() {
 		contracts.NSDhantra,
 		contracts.Producer{Product: "dhantra", Version: "scaffold"},
 		"RemediationRequest", req,
+	)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "envelope: %v\n", err)
+		os.Exit(1)
+	}
+	enc := json.NewEncoder(os.Stdout)
+	enc.SetIndent("", "  ")
+	_ = enc.Encode(out)
+}
+
+// runGuide reads a swarm AssessmentSnapshot envelope (stdin) and emits
+// class-specific remediation guidance for its *verified* weaknesses — a JSON
+// envelope by default, or a Markdown report with --report. It changes nothing;
+// it advises on what kind of fix each demonstrated weakness needs.
+func runGuide(args []string) {
+	fs := flag.NewFlagSet("guide", flag.ExitOnError)
+	report := fs.Bool("report", false, "render a Markdown report instead of the JSON envelope")
+	_ = fs.Parse(args)
+
+	raw, err := io.ReadAll(os.Stdin)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "read stdin: %v\n", err)
+		os.Exit(1)
+	}
+	var env contracts.Envelope
+	if err := json.Unmarshal(raw, &env); err != nil {
+		fmt.Fprintf(os.Stderr, "parse envelope: %v\n", err)
+		os.Exit(1)
+	}
+	if _, err := contracts.CheckEnvelope(env); err != nil {
+		fmt.Fprintf(os.Stderr, "guide: incompatible envelope: %v\n", err)
+		os.Exit(1)
+	}
+	if env.Kind != "AssessmentSnapshot" {
+		fmt.Fprintf(os.Stderr, "guide: expected an AssessmentSnapshot envelope, got %q\n", env.Kind)
+		os.Exit(1)
+	}
+	var snap contracts.AssessmentSnapshot
+	if err := env.Decode(&snap); err != nil {
+		fmt.Fprintf(os.Stderr, "decode snapshot: %v\n", err)
+		os.Exit(1)
+	}
+
+	if *report {
+		fmt.Print(remediation.RenderGuidanceMarkdown(snap))
+		return
+	}
+	out, err := contracts.NewEnvelope(
+		contracts.NSDhantra,
+		contracts.Producer{Product: "dhantra", Version: "scaffold"},
+		"RemediationGuidance", remediation.SnapshotGuidance(snap),
 	)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "envelope: %v\n", err)

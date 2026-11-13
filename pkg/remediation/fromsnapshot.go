@@ -46,6 +46,11 @@ func RequestFromSnapshot(snap contracts.AssessmentSnapshot) contracts.Remediatio
 		req.Requirements = fmt.Sprintf(
 			"Remediate %d verified weakness(es) from the swarm assessment while preserving legitimate behavior. %d further edge(s) are modeled only and are out of scope until confirmed.",
 			len(req.FindingRefs), modeledOnly)
+		// Name the weakness classes so the plan knows what *kind* of fix each
+		// finding needs (see `dhantra guide` for the full per-class steps).
+		if line := GuidanceSummaryLine(snap); line != "" {
+			req.Requirements += " " + line
+		}
 	}
 	return req
 }
