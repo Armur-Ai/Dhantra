@@ -21,12 +21,14 @@ import (
 
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Fprintln(os.Stderr, "usage: dhantra plan < request.json   |   dhantra dryrun --propose <dir> < plan.json   |   dhantra version")
+		fmt.Fprintln(os.Stderr, "usage: dhantra plan < request.json   |   dhantra from-snapshot < snapshot.json   |   dhantra dryrun --propose <dir> < plan.json   |   dhantra version")
 		os.Exit(2)
 	}
 	switch os.Args[1] {
 	case "plan":
 		runPlan()
+	case "from-snapshot":
+		runFromSnapshot()
 	case "dryrun":
 		runDryRun(os.Args[2:])
 	case "version":
@@ -99,6 +101,48 @@ func readProposed(dir string) (map[string][]byte, error) {
 		return nil
 	})
 	return out, err
+}
+
+// runFromSnapshot reads a Pentest Swarm AssessmentSnapshot envelope (JSON on
+// stdin) and emits a RemediationRequest envelope derived from its verified
+// weaknesses — ready to pipe into `dhantra plan`.
+func runFromSnapshot() {
+	raw, err := io.ReadAll(os.Stdin)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "read stdin: %v\n", err)
+		os.Exit(1)
+	}
+	var env contracts.Envelope
+	if err := json.Unmarshal(raw, &env); err != nil {
+		fmt.Fprintf(os.Stderr, "parse envelope: %v\n", err)
+		os.Exit(1)
+	}
+	if _, err := contracts.CheckEnvelope(env); err != nil {
+		fmt.Fprintf(os.Stderr, "from-snapshot: incompatible envelope: %v\n", err)
+		os.Exit(1)
+	}
+	if env.Kind != "AssessmentSnapshot" {
+		fmt.Fprintf(os.Stderr, "from-snapshot: expected an AssessmentSnapshot envelope, got %q\n", env.Kind)
+		os.Exit(1)
+	}
+	var snap contracts.AssessmentSnapshot
+	if err := env.Decode(&snap); err != nil {
+		fmt.Fprintf(os.Stderr, "decode snapshot: %v\n", err)
+		os.Exit(1)
+	}
+	req := remediation.RequestFromSnapshot(snap)
+	out, err := contracts.NewEnvelope(
+		contracts.NSDhantra,
+		contracts.Producer{Product: "dhantra", Version: "scaffold"},
+		"RemediationRequest", req,
+	)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "envelope: %v\n", err)
+		os.Exit(1)
+	}
+	enc := json.NewEncoder(os.Stdout)
+	enc.SetIndent("", "  ")
+	_ = enc.Encode(out)
 }
 
 func runPlan() {
