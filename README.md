@@ -77,6 +77,30 @@ go install github.com/Armur-Ai/Dhantra/cmd/dhantra@latest
 
 Module path: `github.com/Armur-Ai/Dhantra`.
 
+## Commands
+
+```bash
+# Turn a Pentest-Swarm AssessmentSnapshot into a RemediationRequest
+#   (only VERIFIED weaknesses become finding refs; modeled-only stays unconfirmed)
+dhantra from-snapshot < snapshot.json > request.json
+
+# Class-specific remediation guidance for a snapshot's verified weaknesses
+#   (CWE-tagged fix steps per class: rce/privesc/bola/cred/ssrf/leak/recon)
+dhantra guide --report < snapshot.json
+
+# Plan a repair from an authorized request (refuses without allowed change classes)
+dhantra plan < request.json > plan.json
+
+# Dry-run: write proposed files into an isolated workspace, emit a ChangeArtifact
+#   marked review_state="proposed" — a proposal, never an applied repair
+dhantra dryrun --propose ./proposed-changes < plan.json
+```
+
+> **Honesty rule.** Dhantra never advises on, or proposes a change for, a
+> weakness that was merely *modeled* and not demonstrated — that stays an
+> explicit assumption for a human to confirm. A CVSS score is not an
+> authorization to modify anything.
+
 ## Status & roadmap
 
 Fresh scaffold. See [ROADMAP.md](./ROADMAP.md).
