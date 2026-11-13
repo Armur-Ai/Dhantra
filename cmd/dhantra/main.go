@@ -132,6 +132,10 @@ func runFromSnapshot() {
 		fmt.Fprintf(os.Stderr, "decode snapshot: %v\n", err)
 		os.Exit(1)
 	}
+	if err := snap.Validate(); err != nil {
+		fmt.Fprintf(os.Stderr, "from-snapshot: %v\n", err)
+		os.Exit(1)
+	}
 	req := remediation.RequestFromSnapshot(snap)
 	out, err := contracts.NewEnvelope(
 		contracts.NSDhantra,
@@ -177,6 +181,10 @@ func runGuide(args []string) {
 	var snap contracts.AssessmentSnapshot
 	if err := env.Decode(&snap); err != nil {
 		fmt.Fprintf(os.Stderr, "decode snapshot: %v\n", err)
+		os.Exit(1)
+	}
+	if err := snap.Validate(); err != nil {
+		fmt.Fprintf(os.Stderr, "guide: %v\n", err)
 		os.Exit(1)
 	}
 
